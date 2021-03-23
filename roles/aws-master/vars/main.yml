@@ -1,0 +1,9 @@
+---
+# vars file for aws_master
+master_tag_name: "KubeMaster"
+subnet_name: " " 
+key_name: " " 
+security_id: " " 
+ami_id: " " 
+instance_type: " " 
+region_name: " " 

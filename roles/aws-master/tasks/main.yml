@@ -1,0 +1,18 @@
+---
+# tasks file for aws_ec2 
+- name: Lauching ec2 instance
+  ec2:
+    key_name: "{{ key_name  }}"
+    group_id: "{{ security_id  }}"
+    instance_type: "{{ instance_type  }}"
+    image: "{{ ami_id  }}"
+    region: "{{ region_name  }}"
+    wait: yes
+    instance_tags:
+      name: "{{ master_tag_name }}"
+    count: 1
+    vpc_subnet_id: "{{ subnet_name  }}"
+    assign_public_ip: yes 
+- name: Refresh Inventory
+  meta: refresh_inventory  
+
