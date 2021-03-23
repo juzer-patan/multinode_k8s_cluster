@@ -1,0 +1,4 @@
+- hosts: localhost 
+  roles: 
+  - aws_master
+  - aws_slave  

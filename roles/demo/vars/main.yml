@@ -1,0 +1,5 @@
+---
+# vars file for demo
+group_master: "tag_Name_kubemaster"
+group_worker: "tag_Name_kubeworker"
+  

@@ -1,0 +1,4 @@
+---
+# vars file for kubernetes_cluster
+group_master: "tag_name_KubeMaster"
+group_worker: "tag_name_KubeWorker"

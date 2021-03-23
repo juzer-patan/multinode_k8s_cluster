@@ -1,0 +1,20 @@
+---
+# tasks file for demo
+- name: "getting token"
+  shell: kubeadm token create --print-join-command
+  register: token
+  when: inventory_hostname in groups["{{ group_master }}"] 
+- debug: 
+    var: token
+- name: "copying token to my local system"
+  local_action:
+    module: copy
+    content: "{{ token.stdout }}"
+    dest: slave_token.sh
+  when: inventory_hostname in groups["{{ group_master }}"] 
+- name: "copying token to slave"
+  copy:
+      src: slave_token.sh
+      dest: /root
+      mode: 0777
+

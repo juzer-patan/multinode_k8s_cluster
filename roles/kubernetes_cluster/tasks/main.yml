@@ -1,0 +1,117 @@
+---
+# tasks file for kubernetes_cluster
+- name: Install docker 
+  package: 
+    name: 'docker' 
+    state: present 
+  when: inventory_hostname in groups["{{ group_master }}"] or groups["{{ group_worker }}"]
+      
+- name: Start docker 
+  service: 
+    name: 'docker' 
+    state: started 
+    enabled: yes
+  when: inventory_hostname in groups["{{ group_master }}"] or groups["{{ group_worker }}"]
+- name: Copy Kubernetes repo 
+  copy: 
+    src: 'kubernetes.repo' 
+    dest: '/etc/yum.repos.d/'
+  when: inventory_hostname in groups["{{ group_master }}"] or groups["{{ group_worker }}"]
+- name: Install kubeadm kubelet kubectl
+  yum:
+    name: "{{  item  }}"
+    state: present
+    disable_excludes: kubernetes
+  with_items:
+     - kubeadm
+     - kubelet
+     - kubectl 
+  register: kubeadm_status   
+  when: inventory_hostname in groups["{{ group_master }}"] or groups["{{ group_worker }}"]
+- name: Start kubelet 
+  service: 
+    name: 'kubelet' 
+    state: started 
+    enabled: yes
+  when: inventory_hostname in groups["{{ group_master }}"] or groups["{{ group_worker }}"]
+- name: Pull images for pods
+  command: kubeadm config images pull
+  when: inventory_hostname in groups["{{ group_master }}"]
+- name: Copy daemon file for docker    
+  copy: 
+    src: 'daemon.json' 
+    dest: '/etc/docker/'
+  register : docker_status  
+  when: inventory_hostname in groups["{{ group_master }}"] or groups["{{ group_worker }}"]
+  #- debug : 
+  # var: docker_status  
+- name: Restart docker 
+  service: 
+    name: 'docker' 
+    state: restarted 
+  when: 
+    - docker_status.changed == true  
+    - inventory_hostname in groups["{{ group_master }}"] or groups["{{ group_worker }}"]  
+- name: Install ip-route 
+  package: 
+    name: 'iproute-tc' 
+    state: present
+  when: inventory_hostname in groups["{{ group_master }}"] or groups["{{ group_worker }}"]
+- debug : 
+    var: kubeadm_status  
+- name: Configure master using kubeadm
+  shell: kubeadm init --pod-network-cidr=10.244.0.0/16 --ignore-preflight-errors=NumCPU --ignore-preflight-errors=Mem >> kubeadm_init_log.txt
+  args:
+    chdir: /root/
+    creates: kubeadm_init_log.txt     
+  when: 
+    - kubeadm_status.changed == true 
+    - inventory_hostname in groups["{{ group_master }}"] 
+  register: kubeinit_status    
+- name: Copy the admin files 
+  shell: "{{  item  }}"
+  with_items: 
+    - mkdir -p $HOME/.kube 
+    - cp -i /etc/kubernetes/admin.conf $HOME/.kube/config 
+    - chown $(id -u):$(id -g) $HOME/.kube/config   
+  when: 
+    - kubeinit_status.changed == true 
+    - inventory_hostname in groups["{{ group_master }}"] 
+- name: Create flannel overlay network
+  shell: kubectl apply  -f https://raw.githubusercontent.com/coreos/flannel/master/Documentation/kube-flannel.yml  
+  when: 
+    - kubeinit_status.changed == true 
+    - inventory_hostname in groups["{{ group_master }}"] 
+- name: Copy conf file for netbridge   
+  copy: 
+    src: 'k8s.conf' 
+    dest: '/etc/sysctl.d/'
+  register : conf_status
+  when: inventory_hostname in groups["{{ group_worker }}"]
+- name: Sysctl
+  command: "sysctl --system"
+  when: 
+    - conf_status.changed == true 
+    - inventory_hostname in groups["{{ group_worker }}"]
+- name: "getting token"
+  shell: kubeadm token create --print-join-command
+  register: token 
+  when: inventory_hostname in groups["{{ group_master }}"] 
+- debug: 
+    var: token
+- name: "copying token to my local system"
+  local_action:
+    module: copy
+    content: "{{ token.stdout }}"
+    dest: slave_token.sh
+  when: inventory_hostname in groups["{{ group_master }}"] 
+- name: "copying token to slave"
+  copy:
+      src: slave_token.sh
+      dest: /root
+      mode: 0777
+  when: inventory_hostname in groups["{{ group_worker }}"] 
+- name: "running token file"
+  command: "sh /root/slave_token.sh"  
+  when: inventory_hostname in groups["{{ group_worker }}"] 
+
