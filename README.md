@@ -11,6 +11,10 @@ This repository contains Ansible Roles which will
 
 Steps
 ------------
+- Clone the GitHub repo
+```
+git clone https://github.com/juzer-patan/multinode_k8s_cluster.git
+```
 - Replace your AWS Key with the file ```aws_key.pem```
 - Make the key executable using 
 ```
